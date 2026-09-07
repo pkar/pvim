@@ -1,0 +1,5 @@
+foo	buf.txt	/^int foo/;"	f
+foo	buf.txt	/^int foo2/;"	v
+int foo
+int foo2
+call foo

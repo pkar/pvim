@@ -1,0 +1,5 @@
+foo	buf.txt	/^nothing here/
+alpha
+beta
+gamma
+call foo

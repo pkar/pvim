@@ -1,0 +1,7 @@
+bar	buf.txt	/^int bar/
+foo	buf.txt	/^int foo/
+foo	buf.txt	/^int foo2/
+int foo
+int foo2
+int bar
+

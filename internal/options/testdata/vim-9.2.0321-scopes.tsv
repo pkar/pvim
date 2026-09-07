@@ -1,0 +1,456 @@
+aleph	al	number	global
+allowrevins	ari	boolean	global
+altkeymap	akm	boolean	global
+ambiwidth	ambw	string	global
+antialias	anti	boolean	global
+arabic	arab	boolean	window
+arabicshape	arshape	boolean	global
+autochdir	acd	boolean	global
+autocomplete	ac	boolean	global-buffer
+autocompletedelay	acl	number	global
+autocompletetimeout	act	number	global
+autoindent	ai	boolean	buffer
+autoread	ar	boolean	global-buffer
+autoshelldir	asd	boolean	global
+autowrite	aw	boolean	global
+autowriteall	awa	boolean	global
+background	bg	string	global
+backspace	bs	string	global
+backup	bk	boolean	global
+backupcopy	bkc	string	global-buffer
+backupdir	bdir	string	global
+backupext	bex	string	global
+backupskip	bsk	string	global
+balloondelay	bdlay	number	global
+ballooneval	beval	boolean	global
+balloonevalterm	bevalterm	boolean	global
+balloonexpr	bexpr	string	global-buffer
+belloff	bo	string	global
+binary	bin	boolean	buffer
+bioskey	biosk	boolean	global
+blurradius	blur	number	global
+bomb		boolean	buffer
+breakat	brk	string	global
+breakindent	bri	boolean	window
+breakindentopt	briopt	string	window
+browsedir	bsdir	string	global
+bufhidden	bh	string	buffer
+buflisted	bl	boolean	buffer
+buftype	bt	string	buffer
+casemap	cmp	string	global
+cdhome	cdh	boolean	global
+cdpath	cd	string	global
+cedit		string	global
+charconvert	ccv	string	global
+chistory	chi	number	global
+cindent	cin	boolean	buffer
+cinkeys	cink	string	buffer
+cinoptions	cino	string	buffer
+cinscopedecls	cinsd	string	buffer
+cinwords	cinw	string	buffer
+clipboard	cb	string	global
+clipmethod	cpm	string	global
+cmdheight	ch	number	global-tabpage
+cmdwinheight	cwh	number	global
+colorcolumn	cc	string	window
+columns	co	number	global
+columnspace	csp	number	global
+comments	com	string	buffer
+commentstring	cms	string	buffer
+compatible	cp	boolean	global
+complete	cpt	string	buffer
+completefunc	cfu	string	buffer
+completefuzzycollect	cfc	string	global
+completeitemalign	cia	string	global
+completeopt	cot	string	global-buffer
+completepopup	cpp	string	global
+completeslash	csl	string	buffer
+completetimeout	cto	number	global
+concealcursor	cocu	string	window
+conceallevel	cole	number	window
+confirm	cf	boolean	global
+conskey	consk	boolean	global
+copyindent	ci	boolean	buffer
+cpoptions	cpo	string	global
+cryptmethod	cm	string	global-buffer
+cscopepathcomp	cspc	number	global
+cscopeprg	csprg	string	global
+cscopequickfix	csqf	string	global
+cscoperelative	csre	boolean	global
+cscopetag	cst	boolean	global
+cscopetagorder	csto	number	global
+cscopeverbose	csverb	boolean	global
+cursorbind	crb	boolean	window
+cursorcolumn	cuc	boolean	window
+cursorline	cul	boolean	window
+cursorlineopt	culopt	string	window
+debug		string	global
+define	def	string	global-buffer
+delcombine	deco	boolean	global
+dictionary	dict	string	global-buffer
+diff		boolean	window
+diffanchors	dia	string	global-buffer
+diffexpr	dex	string	global
+diffopt	dip	string	global
+digraph	dg	boolean	global
+directory	dir	string	global
+display	dy	string	global
+eadirection	ead	string	global
+edcompatible	ed	boolean	global
+emoji	emo	boolean	global
+encoding	enc	string	global
+endoffile	eof	boolean	buffer
+endofline	eol	boolean	buffer
+equalalways	ea	boolean	global
+equalprg	ep	string	global-buffer
+errorbells	eb	boolean	global
+errorfile	ef	string	global
+errorformat	efm	string	global-buffer
+esckeys	ek	boolean	global
+eventignore	ei	string	global
+expandtab	et	boolean	buffer
+exrc	ex	boolean	global
+fileencoding	fenc	string	buffer
+fileencodings	fencs	string	global
+fileformat	ff	string	buffer
+fileformats	ffs	string	global
+fileignorecase	fic	boolean	global
+filetype	ft	string	buffer
+fillchars	fcs	string	global-window
+findfunc	ffu	string	global-buffer
+fixendofline	fixeol	boolean	buffer
+fkmap	fk	boolean	global
+foldclose	fcl	string	global
+foldcolumn	fdc	number	window
+foldenable	fen	boolean	window
+foldexpr	fde	string	window
+foldignore	fdi	string	window
+foldlevel	fdl	number	window
+foldlevelstart	fdls	number	global
+foldmarker	fmr	string	window
+foldmethod	fdm	string	window
+foldminlines	fml	number	window
+foldnestmax	fdn	number	window
+foldopen	fdo	string	global
+foldtext	fdt	string	window
+formatexpr	fex	string	buffer
+formatlistpat	flp	string	buffer
+formatoptions	fo	string	buffer
+formatprg	fp	string	global-buffer
+fsync	fs	boolean	global-buffer
+fullscreen	fu	boolean	global
+fuoptions	fuopt	string	global
+gdefault	gd	boolean	global
+grepformat	gfm	string	global-buffer
+grepprg	gp	string	global-buffer
+guicursor	gcr	string	global
+guifont	gfn	string	global
+guifontset	gfs	string	global
+guifontwide	gfw	string	global
+guiheadroom	ghr	number	global
+guiligatures	gli	string	global
+guioptions	go	string	global
+guipty		boolean	global
+guitablabel	gtl	string	global
+guitabtooltip	gtt	string	global
+helpfile	hf	string	global
+helpheight	hh	number	global
+helplang	hlg	string	global
+hidden	hid	boolean	global
+highlight	hl	string	global
+history	hi	number	global
+hkmap	hk	boolean	global
+hkmapp	hkp	boolean	global
+hlsearch	hls	boolean	global
+icon		boolean	global
+iconstring		string	global
+ignorecase	ic	boolean	global
+imactivatefunc	imaf	string	global
+imactivatekey	imak	string	global
+imcmdline	imc	boolean	global
+imdisable	imd	boolean	global
+iminsert	imi	number	buffer
+imsearch	ims	number	buffer
+imstatusfunc	imsf	string	global
+imstyle	imst	number	global
+include	inc	string	global-buffer
+includeexpr	inex	string	buffer
+incsearch	is	boolean	global
+indentexpr	inde	string	buffer
+indentkeys	indk	string	buffer
+infercase	inf	boolean	buffer
+insertmode	im	boolean	global
+isfname	isf	string	global
+isident	isi	string	global
+iskeyword	isk	string	buffer
+isprint	isp	string	global
+joinspaces	js	boolean	global
+jumpoptions	jop	string	global
+key		string	buffer
+keymap	kmp	string	buffer
+keymodel	km	string	global
+keyprotocol	kpc	string	global
+keywordprg	kp	string	global-buffer
+langmap	lmap	string	global
+langmenu	lm	string	global
+langnoremap	lnr	boolean	global
+langremap	lrm	boolean	global
+laststatus	ls	number	global
+lazyredraw	lz	boolean	global
+lhistory	lhi	number	window
+linebreak	lbr	boolean	window
+lines		number	global
+linespace	lsp	number	global
+lisp		boolean	buffer
+lispoptions	lop	string	buffer
+lispwords	lw	string	global-buffer
+list		boolean	window
+listchars	lcs	string	global-window
+loadplugins	lpl	boolean	global
+luadll		string	global
+macatsui		boolean	global
+macligatures		boolean	global
+macmeta		boolean	buffer
+macthinstrokes		boolean	global
+magic		boolean	global
+makeef	mef	string	global
+makeencoding	menc	string	global-buffer
+makeprg	mp	string	global-buffer
+matchpairs	mps	string	buffer
+matchtime	mat	number	global
+maxcombine	mco	number	global
+maxfuncdepth	mfd	number	global
+maxmapdepth	mmd	number	global
+maxmem	mm	number	global
+maxmempattern	mmp	number	global
+maxmemtot	mmt	number	global
+maxsearchcount	msc	number	global
+menuitems	mis	number	global
+messagesopt	mopt	string	global
+mkspellmem	msm	string	global
+modeline	ml	boolean	buffer
+modelineexpr	mle	boolean	global
+modelines	mls	number	global
+modifiable	ma	boolean	buffer
+modified	mod	boolean	buffer
+more		boolean	global
+mouse		string	global
+mousefocus	mousef	boolean	global
+mousehide	mh	boolean	global
+mousemodel	mousem	string	global
+mousemoveevent	mousemev	boolean	global
+mouseshape	mouses	string	global
+mousetime	mouset	number	global
+mzquantum	mzq	number	global
+mzschemedll		string	global
+mzschemegcdll		string	global
+nrformats	nf	string	buffer
+number	nu	boolean	window
+numberwidth	nuw	number	window
+omnifunc	ofu	string	buffer
+opendevice	odev	boolean	global
+operatorfunc	opfunc	string	global
+osctimeoutlen	ost	number	global
+osfiletype	oft	string	buffer
+paragraphs	para	string	global
+paste		boolean	global
+pastetoggle	pt	string	global
+patchexpr	pex	string	global
+patchmode	pm	string	global
+path	pa	string	global-buffer
+perldll		string	global
+preserveindent	pi	boolean	buffer
+previewheight	pvh	number	global
+previewpopup	pvp	string	global
+previewwindow	pvw	boolean	window
+printdevice	pdev	string	global
+printencoding	penc	string	global
+printexpr	pexpr	string	global
+printfont	pfn	string	global
+printheader	pheader	string	global
+printmbcharset	pmbcs	string	global
+printmbfont	pmbfn	string	global
+printoptions	popt	string	global
+prompt		boolean	global
+pumborder	pb	string	global
+pumheight	ph	number	global
+pummaxwidth	pmw	number	global
+pumopt		string	global
+pumwidth	pw	number	global
+pythondll		string	global
+pythonhome		string	global
+pythonthreedll		string	global
+pythonthreehome		string	global
+pyxversion	pyx	number	global
+quickfixtextfunc	qftf	string	global
+quoteescape	qe	string	buffer
+readonly	ro	boolean	buffer
+redrawtime	rdt	number	global
+regexpengine	re	number	global
+relativenumber	rnu	boolean	window
+remap		boolean	global
+renderoptions	rop	string	global
+report		number	global
+restorescreen	rs	boolean	global
+revins	ri	boolean	global
+rightleft	rl	boolean	window
+rightleftcmd	rlc	string	window
+rubydll		string	global
+ruler	ru	boolean	global
+rulerformat	ruf	string	global
+runtimepath	rtp	string	global
+scroll	scr	number	window
+scrollbind	scb	boolean	window
+scrollfocus	scf	boolean	global
+scrolljump	sj	number	global
+scrolloff	so	number	global-window
+scrollopt	sbo	string	global
+sections	sect	string	global
+secure		boolean	global
+selection	sel	string	global
+selectmode	slm	string	global
+sessionoptions	ssop	string	global
+shell	sh	string	global
+shellcmdflag	shcf	string	global
+shellpipe	sp	string	global
+shellquote	shq	string	global
+shellredir	srr	string	global
+shellslash	ssl	boolean	global
+shelltemp	stmp	boolean	global
+shelltype	st	number	global
+shellxescape	sxe	string	global
+shellxquote	sxq	string	global
+shiftround	sr	boolean	global
+shiftwidth	sw	number	buffer
+shortname	sn	boolean	buffer
+showbreak	sbr	string	global-window
+showcmd	sc	boolean	global
+showcmdloc	sloc	string	global
+showfulltag	sft	boolean	global
+showmatch	sm	boolean	global
+showmode	smd	boolean	global
+showtabline	stal	number	global
+showtabpanel	stpl	number	global
+sidescroll	ss	number	global
+sidescrolloff	siso	number	global-window
+signcolumn	scl	string	window
+smartcase	scs	boolean	global
+smartindent	si	boolean	buffer
+smarttab	sta	boolean	global
+smoothscroll	sms	boolean	window
+softtabstop	sts	number	buffer
+spell		boolean	window
+spellcapcheck	spc	string	buffer
+spellfile	spf	string	buffer
+spelllang	spl	string	buffer
+spelloptions	spo	string	buffer
+spellsuggest	sps	string	global
+splitbelow	sb	boolean	global
+splitkeep	spk	string	global
+splitright	spr	boolean	global
+startofline	sol	boolean	global
+statusline	stl	string	global-window
+statuslineopt	stlo	string	global-window
+suffixes	su	string	global
+suffixesadd	sua	string	buffer
+swapfile	swf	boolean	buffer
+swapsync	sws	string	global
+switchbuf	swb	string	global
+synmaxcol	smc	number	buffer
+syntax	syn	string	buffer
+tabclose	tcl	string	global
+tabline	tal	string	global
+tabpagemax	tpm	number	global
+tabpanel	tpl	string	global
+tabpanelopt	tplo	string	global
+tabstop	ts	number	buffer
+tagbsearch	tbs	boolean	global
+tagcase	tc	string	global-buffer
+tagfunc	tfu	string	buffer
+taglength	tl	number	global
+tagrelative	tr	boolean	global
+tags	tag	string	global-buffer
+tagstack	tgst	boolean	global
+tcldll		string	global
+term		string	global
+termbidi	tbidi	boolean	global
+termencoding	tenc	string	global
+termguicolors	tgc	boolean	global
+termresize	trz	string	global
+termsync	tsy	boolean	global
+termwinkey	twk	string	window
+termwinscroll	twsl	number	buffer
+termwinsize	tws	string	window
+termwintype	twt	string	global
+terse		boolean	global
+textauto	ta	boolean	global
+textmode	tx	boolean	buffer
+textwidth	tw	number	buffer
+thesaurus	tsr	string	global-buffer
+thesaurusfunc	tsrfu	string	global-buffer
+tildeop	top	boolean	global
+timeout	to	boolean	global
+timeoutlen	tm	number	global
+title		boolean	global
+titlelen		number	global
+titleold		string	global
+titlestring		string	global
+toolbar	tb	string	global
+toolbariconsize	tbis	string	global
+transparency	transp	number	global
+ttimeout		boolean	global
+ttimeoutlen	ttm	number	global
+ttybuiltin	tbi	boolean	global
+ttyfast	tf	boolean	global
+ttymouse	ttym	string	global
+ttyscroll	tsl	number	global
+ttytype	tty	string	global
+undodir	udir	string	global
+undofile	udf	boolean	buffer
+undolevels	ul	number	global-buffer
+undoreload	ur	number	global
+updatecount	uc	number	global
+updatetime	ut	number	global
+varsofttabstop	vsts	string	buffer
+vartabstop	vts	string	buffer
+verbose	vbs	number	global
+verbosefile	vfile	string	global
+viewdir	vdir	string	global
+viewoptions	vop	string	global
+viminfo	vi	string	global
+viminfofile	vif	string	global
+virtualedit	ve	string	global-window
+visualbell	vb	boolean	global
+warn		boolean	global
+weirdinvert	wiv	boolean	global
+whichwrap	ww	string	global
+wildchar	wc	number	global
+wildcharm	wcm	number	global
+wildignore	wig	string	global
+wildignorecase	wic	boolean	global
+wildmenu	wmnu	boolean	global
+wildmode	wim	string	global
+wildoptions	wop	string	global
+winaltkeys	wak	string	global
+wincolor	wcr	string	window
+window	wi	number	global
+winfixbuf	wfb	boolean	window
+winfixheight	wfh	boolean	window
+winfixwidth	wfw	boolean	window
+winheight	wh	number	global
+winhighlight	whl	string	window
+winminheight	wmh	number	global
+winminwidth	wmw	number	global
+winptydll		string	global
+winwidth	wiw	number	global
+wlseat	wse	string	global
+wlsteal	wst	boolean	global
+wltimeoutlen	wtm	number	global
+wrap		boolean	window
+wrapmargin	wm	number	buffer
+wrapscan	ws	boolean	global
+write		boolean	global
+writeany	wa	boolean	global
+writebackup	wb	boolean	global
+writedelay	wd	number	global
+xtermcodes		boolean	global

@@ -1,0 +1,2 @@
+let g:vim_ai_debug = 0
+let g:vim_ai_debug_log_file = "/tmp/vim_ai_debug.log"

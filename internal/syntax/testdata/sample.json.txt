@@ -1,0 +1,11 @@
+{
+  "name": "pvim",
+  "version": "0.1.0",
+  "nested": { "a": [1, 2.5, -3e10, true, false, null], "b": "esc \" \\ é \t" },
+  "list": [
+    {"k": "v"},
+    {"k": 12}
+  ],
+  "empty": {},
+  "arr": []
+}

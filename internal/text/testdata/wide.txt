@@ -1,0 +1,8 @@
+plain
+	one tab
+		two tabs
+a	世界	b
+é combining
+幅 wide first
+	tab中 wide	after
+no tabs but 😀 emoji

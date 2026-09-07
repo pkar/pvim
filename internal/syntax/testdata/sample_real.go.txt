@@ -1,0 +1,616 @@
+package screen
+
+import (
+	"strings"
+
+	"github.com/pkar/pvim/internal/text"
+	"github.com/pkar/pvim/internal/window"
+)
+
+// One window's text area, drawn a buffer line at a time.
+//
+// Every rule in here is a screen dump of vim 9.2.0321 taken through
+// screenchar() with :set lines= and :set columns=, not a reading of the
+// documentation. Where the two disagreed the dump won; where a dump could not
+// be taken the comment says so.
+
+// winCtx is the state of drawing one window: everything the row loop needs,
+// resolved once so the inner loop does no option lookups.
+type winCtx struct {
+	f   *Frame
+	s   *Screen
+	w   *window.Window
+	g   Groups
+	fld *Folds
+
+	// text is where the buffer's own characters go, which is the window
+	// rectangle less its status line and less the 'number' column.
+	text Region
+	// numWidth is the width of the 'number' column, 0 when 'number' is off.
+	numWidth int
+
+	tabstop     int
+	wrap        bool
+	lineBreak   bool
+	breakIndent bool
+	breakAt     string
+	showBreak   string
+	leftCol     int
+	cursorLine  bool
+
+	current bool
+}
+
+// drawText paints the window's buffer lines, the fold lines that stand in for
+// them, and the '~' rows past the end of the buffer.
+func (c *winCtx) drawText() {
+	b := c.w.Buf
+	if b == nil {
+		b = text.New()
+	}
+	last := b.LineCount()
+
+	row := c.text.Row
+	end := c.text.Row + c.text.Rows
+	lnum := c.w.View.TopLine
+	if lnum < 1 {
+		lnum = 1
+	}
+
+	shown := c.w.View.TopLine
+	if shown < 1 {
+		shown = 1
+	}
+	// shown is the last line the window showed the whole of, which is what
+	// vim's w_botline counts and what line('w$') reports. A line that needed
+	// more rows than were left is not one of them: measured on vim 9.2.0321 at
+	// 40x8 with 'wrap', a buffer of "a" to "e" and a hundred x's answers
+	// line('w$') 5, and the ruler says Top rather than All. The exception is
+	// the top line itself, which vim counts however little of it fits, because
+	// w_botline is never below w_topline + 1: a 300-character line alone in
+	// the same window answers 1.
+	for row < end && lnum <= last {
+		if fold := c.fld.ClosedAt(lnum); fold != nil {
+			c.drawFold(row, fold)
+			row++
+			shown = fold.End
+			lnum = fold.End + 1
+			continue
+		}
+		used, fits := c.drawLine(row, end, lnum, b.Line(lnum))
+		row += used
+		if !fits {
+			break
+		}
+		shown = lnum
+		lnum++
+	}
+
+	c.f.noteBotLine(c.w.ID, min(shown, last))
+
+	// Past the end of the buffer: the 'eob' item of 'fillchars', which is '~',
+	// in EndOfBuffer. Vim paints the whole row in that highlight and not only
+	// the one cell, which shows up the moment a colourscheme gives the group a
+	// background.
+	eob := c.fillChar("eob", '~')
+	for ; row < end; row++ {
+		c.s.Grid.Fill(row, c.text.Col-c.numWidth, c.numWidth+c.text.Cols, ' ', c.g.EndOfBuffer)
+		if eob != 0 {
+			c.s.Grid.Set(row, c.text.Col-c.numWidth, eob, c.g.EndOfBuffer)
+		}
+	}
+}
+
+// drawLine paints one buffer line starting at row, using as many rows as
+// 'wrap' needs, and returns how many it used.
+//
+// The second result is false when the line needed more rows than were left.
+// What happens then is 'display', and vim does three different things:
+//
+//	display=truncate   as many rows as fit less one, then "@@@" on the last
+//	display=lastline   every row that fits, with "@@@" over its last three cells
+//	display=           the line is not drawn at all and every leftover row
+//	                   gets a single "@" in its first column
+//
+// Measured on a 20-column window six rows tall over "aaa", "bbb" and a
+// hundred x's. vim's own defaults.vim sets truncate, so that is what --clean
+// does and what the oracle compares against.
+func (c *winCtx) drawLine(row, end, lnum int, line []byte) (int, bool) {
+	segs := c.segments(line)
+	if !c.wrap {
+		c.drawSegment(row, lnum, line, segs[0], false)
+		return 1, true
+	}
+	if row+len(segs) <= end {
+		for i, seg := range segs {
+			c.drawSegment(row+i, lnum, line, seg, i > 0)
+		}
+		return len(segs), true
+	}
+
+	at := c.fillChar("lastline", '@')
+	col := c.text.Col - c.numWidth
+	width := c.numWidth + c.text.Cols
+
+	switch {
+	case strings.Contains(c.f.Display, "truncate"):
+		for i := 0; row+i < end-1; i++ {
+			c.drawSegment(row+i, lnum, line, segs[i], i > 0)
+		}
+		c.s.Grid.Fill(end-1, col, width, ' ', c.g.NonText)
+		c.s.Grid.Fill(end-1, col, 3, at, c.g.NonText)
+	case strings.Contains(c.f.Display, "lastline"):
+		for i := 0; row+i < end; i++ {
+			c.drawSegment(row+i, lnum, line, segs[i], i > 0)
+		}
+		c.s.Grid.Fill(end-1, col+width-3, 3, at, c.g.NonText)
+	default:
+		for r := row; r < end; r++ {
+			c.s.Grid.Fill(r, col, width, ' ', c.g.NonText)
+			c.s.Grid.Set(r, col, at, c.g.NonText)
+		}
+	}
+	return end - row, false
+}
+
+// drawFold paints the one row a closed fold occupies.
+func (c *winCtx) drawFold(row int, fold *Fold) {
+	c.drawNumber(row, fold.Start, false)
+	txt := FoldText(c.w.Buf, fold, c.fld.LevelAt(fold.Start))
+	col := c.s.Grid.SetString(row, c.text.Col, txt, c.g.Folded)
+	fill := c.fillChar("fold", '-')
+	c.s.Grid.Fill(row, col, c.text.Col+c.text.Cols-col, fill, c.g.Folded)
+	if c.current && c.cursor().Line >= fold.Start && c.cursor().Line <= fold.End {
+		c.s.CursorRow, c.s.CursorCol = row, c.text.Col
+	}
+}
+
+// drawNumber paints the 'number' column for one screen row. wrapped rows get
+// blanks, which is vim with 'cpoptions' free of "n".
+func (c *winCtx) drawNumber(row, lnum int, wrapped bool) {
+	if c.numWidth == 0 {
+		return
+	}
+	col := c.text.Col - c.numWidth
+	hl := c.g.LineNr
+	if c.cursorLine && lnum == c.w.View.Cursor.Line {
+		hl = c.g.CursorLineNr
+	}
+	c.s.Grid.Fill(row, col, c.numWidth, ' ', hl)
+	if wrapped {
+		return
+	}
+	s := itoa(lnum)
+	if len(s) > c.numWidth-1 {
+		s = s[len(s)-(c.numWidth-1):]
+	}
+	c.s.Grid.SetString(row, col+c.numWidth-1-len(s), s, hl)
+}
+
+// segment is one screen row's worth of a buffer line: the characters on it and
+// the number of cells of indent in front of them.
+type segment struct {
+	chars  []Char
+	indent int
+
+	// start is the display column of the row's first text cell, counted from
+	// the left edge of the line. It is not chars[0].Col: a tab split across
+	// the wrap boundary belongs to two rows and starts before the second one
+	// does.
+	start int
+
+	// arrow marks a row that ended because the next character was too wide
+	// for the cell or cells left over. Vim puts a ">" in them rather than
+	// leaving them blank, under 'wrap' as well as under 'nowrap'.
+	arrow bool
+}
+
+// segments splits a line into the rows it occupies.
+//
+// Under 'nowrap' there is always exactly one, holding every character, and the
+// row loop clips it against LeftCol. Under 'wrap' the split honours
+// 'breakindent' and 'linebreak', both measured against vim:
+//
+//	:set wrap breakindent, columns=30, "    alpha beta ... kappa"
+//	    alpha beta gamma delta eps
+//	    ilon zeta eta theta iota k
+//	    appa
+//
+//	:set wrap breakindent linebreak
+//	    alpha beta gamma delta
+//	    epsilon zeta eta theta
+//	    iota kappa
+func (c *winCtx) segments(line []byte) []segment {
+	chars := Chars(line, c.tabstop)
+	if !c.wrap || len(chars) == 0 {
+		// An empty line is one empty row, wrapped or not. Without this the
+		// loop below has no character to make progress on and walks off the
+		// end of the slice.
+		return []segment{{chars: chars}}
+	}
+
+	width := c.text.Cols
+	if width < 1 {
+		width = 1
+	}
+	indent := c.continuationIndent(line, width)
+
+	var out []segment
+	i := 0
+	col := 0 // display column this row's text starts at
+	for {
+		avail := width
+		if len(out) > 0 {
+			avail = width - indent
+		}
+		if avail < 1 {
+			avail = 1
+		}
+		start := i
+		at := col // display column reached so far on this row
+		lastBreak := -1
+		for i < len(chars) {
+			if chars[i].Col+chars[i].Width > col+avail {
+				break
+			}
+			at = chars[i].Col + chars[i].Width
+			if c.lineBreak && c.isBreakAt(chars[i]) {
+				lastBreak = i
+			}
+			i++
+		}
+		arrow, split := false, false
+		switch {
+		case i == start && i < len(chars) && chars[i].Tab:
+			// A tab wider than the whole row. Vim fills the row with it and
+			// carries the rest onto the next: at 'tabstop' 16 in a 12-column
+			// window a leading tab leaves the first row blank and four more
+			// cells of it on the second.
+			split = true
+		case i == start:
+			// One character wider than the whole row. It has to go somewhere,
+			// so it goes here and the row overflows into nothing.
+			i++
+		case c.lineBreak && i < len(chars) && lastBreak >= start && lastBreak+1 < i:
+			i = lastBreak + 1
+		case i < len(chars) && at < col+avail && chars[i].Tab:
+			// A tab straddling the right edge is split, and only a tab is:
+			// vim puts the cells before the edge on this row and the rest at
+			// the start of the next, so every display column after it carries
+			// straight across. Measured at 12 columns, 'tabstop' 8, over
+			// "aaaaaaaaaa<Tab>Zbbbbbbbbbbbbbbb":
+			//
+			//	aaaaaaaaaa
+			//	    Zbbbbbbb
+			//	bbbbbbbb
+			split = true
+		case i < len(chars) && at < col+avail && chars[i].Width > 1:
+			arrow = true
+		}
+
+		seg := segment{start: col, arrow: arrow}
+		if split {
+			// The tab is on both rows: this one draws the cells up to the
+			// edge and the next one draws the rest, each clipped by drawChar.
+			seg.chars = chars[start : i+1]
+		} else {
+			seg.chars = chars[start:i]
+		}
+		if len(out) > 0 {
+			seg.indent = indent
+		}
+		out = append(out, seg)
+
+		if split {
+			col += avail
+			continue
+		}
+		if i >= len(chars) {
+			return out
+		}
+		col = chars[i].Col
+	}
+}
+
+// isBreakAt reports whether a character is one 'linebreak' may break after.
+func (c *winCtx) isBreakAt(ch Char) bool {
+	if ch.Tab {
+		return strings.ContainsRune(c.breakAt, '\t')
+	}
+	if ch.Text != "" {
+		return false
+	}
+	return strings.ContainsRune(c.breakAt, ch.Rune)
+}
+
+// continuationIndent is how far in a 'breakindent' continuation row starts.
+//
+// Vim's rule with 'breakindentopt' empty: the line's own indent, but never so
+// far that fewer than 20 cells of text are left. That floor is
+// 'breakindentopt' min:20, which nothing in this editor changes.
+func (c *winCtx) continuationIndent(line []byte, width int) int {
+	if !c.breakIndent {
+		return 0
+	}
+	n := 0
+	for _, b := range line {
+		switch b {
+		case ' ':
+			n++
+		case '\t':
+			n += c.tabstop - n%c.tabstop
+		default:
+			return capIndent(n, width)
+		}
+	}
+	return capIndent(n, width)
+}
+
+// capIndent applies 'breakindentopt' min:20 to a computed indent.
+func capIndent(n, width int) int {
+	if max := width - 20; n > max {
+		n = max
+	}
+	if n < 0 {
+		n = 0
+	}
+	return n
+}
+
+// drawSegment paints one screen row of one buffer line.
+func (c *winCtx) drawSegment(row, lnum int, line []byte, seg segment, cont bool) {
+	c.drawNumber(row, lnum, cont)
+
+	base := c.g.Normal()
+	if c.cursorLine && lnum == c.w.View.Cursor.Line {
+		base = c.g.CursorLine
+	}
+	c.s.Grid.Fill(row, c.text.Col, c.text.Cols, ' ', base)
+
+	left := c.text.Col
+	right := left + c.text.Cols
+	off := 0 // cells of the row already used
+	if cont {
+		off = seg.indent
+		if c.showBreak != "" {
+			off = c.s.Grid.SetString(row, left+off, c.showBreak, c.g.NonText) - left
+		}
+	}
+
+	// Under 'nowrap' the row shows the line from LeftCol; under 'wrap' the
+	// segment already starts where the row does.
+	origin := 0
+	if !c.wrap {
+		origin = c.leftCol
+	} else {
+		origin = seg.start - off
+	}
+
+	cursorOnLine := c.current && c.cursor().Line == lnum
+	matches := c.matchesOn(lnum)
+
+	if seg.arrow && len(seg.chars) > 0 {
+		last := seg.chars[len(seg.chars)-1]
+		if x := left + last.Col + last.Width - origin; x < right {
+			c.s.Grid.Fill(row, x, right-x, '>', c.g.NonText)
+		}
+	}
+
+	for _, ch := range seg.chars {
+		x := left + ch.Col - origin
+		if x+ch.Width <= left {
+			continue
+		}
+		if x >= right {
+			break
+		}
+		hl := base
+		if id, ok := matchHL(matches, ch.Byte, ch.Size); ok {
+			hl = id
+		}
+		if cursorOnLine && c.cursorIn(ch) {
+			c.s.CursorRow, c.s.CursorCol = row, clampCol(x, left, right-1)
+		}
+		c.drawChar(row, x, left, right, ch, hl)
+	}
+
+	// The cell after the last byte of the line, which is the newline. Two
+	// different things land on it.
+	//
+	// A cursor past the last byte sits there, which is where insert mode
+	// leaves it and where an empty line puts it.
+	//
+	// A match whose End runs past the last byte highlights it, which is what
+	// makes a linewise Visual selection on a short line look different from a
+	// charwise one that stopped at the end of the text, and is the only way an
+	// empty line inside a selection shows at all. Measured on vim 9.2.0321 at
+	// 20 columns over "abc", an empty line and "ijk", reading screenattr() per
+	// cell: "Vjj" highlights four cells on row 1 and one on row 2, while "v$"
+	// on the same first line highlights three. There is no byte past the last
+	// one to hang a Char on, so it cannot come out of the loop above.
+	if lastSegment(line, seg) {
+		x := left
+		if n := len(seg.chars); n > 0 {
+			last := seg.chars[n-1]
+			x = left + last.Col + last.Width - origin
+		}
+		if hl, ok := matchHL(matches, len(line), 1); ok && x >= left && x < right {
+			c.s.Grid.Set(row, x, ' ', hl)
+		}
+		if cursorOnLine && c.cursor().Col >= len(line) {
+			c.s.CursorRow, c.s.CursorCol = row, clampCol(x, left, right-1)
+		}
+	}
+}
+
+// lastSegment reports whether a segment holds the end of its line, which is
+// where a cursor past the last byte belongs.
+func lastSegment(line []byte, seg segment) bool {
+	if len(seg.chars) == 0 {
+		return len(line) == 0
+	}
+	last := seg.chars[len(seg.chars)-1]
+	return last.Byte+last.Size >= len(line)
+}
+
+// drawChar puts one character's cells on the row, clipped to left..right.
+//
+// The two clipped cases are vim's, both measured on a 12-column screen under
+// 'nowrap' over "ab" followed by CJK runes, scrolled a column at a time with
+// zl:
+//
+//	b一二三四五>     leftcol 1: the rune at the right edge becomes ">"
+//	<二三四五六>     leftcol 3: the rune split by the left edge becomes "<"
+func (c *winCtx) drawChar(row, x, left, right int, ch Char, hl HLID) {
+	switch {
+	case ch.Tab:
+		n := ch.Width
+		if x < left {
+			n -= left - x
+			x = left
+		}
+		if x+n > right {
+			n = right - x
+		}
+		c.s.Grid.Fill(row, x, n, ' ', hl)
+	case ch.Text != "":
+		for _, r := range ch.Text {
+			if x >= left && x < right {
+				c.s.Grid.Set(row, x, r, hl)
+			}
+			x++
+		}
+	case x < left:
+		c.s.Grid.Fill(row, left, x+ch.Width-left, '<', c.g.NonText)
+	case x+ch.Width > right:
+		// A double-width rune that will not fit in the cells left is not
+		// drawn: vim puts a '>' in the last column instead. Measured on a
+		// 12-column screen with "abcdefghijk" then a CJK rune, under both
+		// 'wrap' and 'nowrap':
+		//
+		//	abcdefghijk>
+		c.s.Grid.Set(row, x, '>', c.g.NonText)
+	default:
+		c.s.Grid.Set(row, x, ch.Rune, hl)
+	}
+}
+
+// cursorIn reports whether the window's cursor byte falls in this character.
+func (c *winCtx) cursorIn(ch Char) bool {
+	col := c.cursor().Col
+	return col >= ch.Byte && col < ch.Byte+ch.Size
+}
+
+// cursor is where the caret goes: the window's own cursor, unless the frame
+// has moved it for one redraw, which is what 'showmatch' does.
+func (c *winCtx) cursor() text.Pos {
+	if c.f.CursorOver != nil {
+		return *c.f.CursorOver
+	}
+	return c.w.View.Cursor
+}
+
+// matchesOn gathers every highlighted byte range on a line, in the order the
+// later ones win: 'hlsearch' first, then the 'incsearch' preview, then the
+// visual selection on top.
+func (c *winCtx) matchesOn(lnum int) []hlRange {
+	var out []hlRange
+	if c.f.Search != nil {
+		for _, m := range c.f.Search.MatchesOn(lnum) {
+			out = append(out, hlRange{m.Start, m.End, c.g.Search})
+		}
+	}
+	if m := c.f.IncSearch; m != nil && m.Line == lnum {
+		out = append(out, hlRange{m.Start, m.End, c.g.IncSearch})
+	}
+	if c.f.Visual != nil {
+		for _, m := range c.f.Visual.MatchesOn(lnum) {
+			out = append(out, hlRange{m.Start, m.End, c.g.Visual})
+		}
+	}
+	return out
+}
+
+// hlRange is a byte range on one line and the highlight it carries.
+type hlRange struct {
+	start, end int
+	hl         HLID
+}
+
+// matchHL returns the highlight covering a character, if any. A character is
+// covered when any of its bytes are, which is what puts every cell of a tab in
+// the Search highlight when a match runs across it:
+//
+//	:set hlsearch tabstop=4, /ab\tcd over "zz ab<Tab>cd zz"
+//	zz ab   cd zz
+//	...aaaaaaa...   (a = Search)
+func matchHL(ranges []hlRange, byteAt, size int) (HLID, bool) {
+	found, ok := HLID(0), false
+	for _, r := range ranges {
+		if byteAt < r.end && byteAt+size > r.start {
+			found, ok = r.hl, true
+		}
+	}
+	return found, ok
+}
+
+// clampCol keeps a cursor cell inside the window. The high end wins when the
+// window is so narrow that there is no room between the two, because a cell
+// past the right-hand edge is off the grid and one before the left is only
+// off the text area.
+func clampCol(x, lo, hi int) int {
+	if x < lo {
+		x = lo
+	}
+	if x > hi {
+		x = hi
+	}
+	return x
+}
+
+// Normal is the id every un-highlighted cell carries, spelled as a method so
+// that drawing code reads the same whichever group it is asking for.
+func (g Groups) Normal() HLID { return HLID(0) }
+
+// fillChar returns one item of 'fillchars', or def when it is not set.
+func (c *winCtx) fillChar(item string, def rune) rune {
+	return fillChar(c.f.opts().G.FillChars, item, def)
+}
+
+// fillChar parses one item out of a 'fillchars' string.
+func fillChar(spec, item string, def rune) rune {
+	for _, part := range strings.Split(spec, ",") {
+		name, val, ok := strings.Cut(part, ":")
+		if !ok || name != item {
+			continue
+		}
+		for _, r := range val {
+			return r
+		}
+	}
+	return def
+}
+
+// itoa is strconv.Itoa for a non-negative line number, here so the hot row
+// loop does not reach for a package for three digits.
+func itoa(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	neg := n < 0
+	if neg {
+		n = -n
+	}
+	var b [20]byte
+	i := len(b)
+	for n > 0 {
+		i--
+		b[i] = byte('0' + n%10)
+		n /= 10
+	}
+	if neg {
+		i--
+		b[i] = '-'
+	}
+	return string(b[i:])
+}

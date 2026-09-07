@@ -1,0 +1,149 @@
+set nocompatible
+filetype plugin indent on
+syntax enable
+
+let s:vim_home = fnamemodify(resolve(expand('<sfile>:p')), ':h')
+execute 'set runtimepath^=' . fnameescape(s:vim_home)
+execute 'set packpath=' . fnameescape(s:vim_home)
+packloadall
+colorscheme nofrils-dark
+set background=dark
+
+if has('gui_running')
+  set guifont=Monaco:h13
+  set guioptions-=e
+endif
+
+if !has('gui_running')
+  set notimeout
+  set ttimeout
+  set ttimeoutlen=10
+  augroup FastEscape
+    autocmd!
+    autocmd InsertEnter * set timeoutlen=0
+    autocmd InsertLeave * set timeoutlen=1000
+  augroup END
+endif
+
+if has('mouse')
+  set mouse=a
+endif
+
+if has('clipboard')
+  set clipboard=unnamed,unnamedplus,autoselect
+  if !has('gui_running')
+    vnoremap <C-c> "+y
+    vnoremap <C-x> "+d
+    vnoremap <C-v> "+p
+    inoremap <C-v> <C-r><C-o>+
+  endif
+endif
+
+let s:vim_state = s:vim_home . '/state'
+if !isdirectory(s:vim_state)
+  call mkdir(s:vim_state, 'p', 0700)
+endif
+if has('persistent_undo')
+  set undofile
+  execute 'set undodir=' . fnameescape(s:vim_state . '/undo//')
+  if !isdirectory(s:vim_state . '/undo')
+    call mkdir(s:vim_state . '/undo', 'p', 0700)
+  endif
+endif
+execute 'set viminfofile=' . fnameescape(s:vim_state . '/viminfo')
+
+let mapleader = ','
+map { gT
+map } gt
+nnoremap <Space> za
+
+set encoding=utf-8
+set fileencoding=utf-8
+set tabstop=2
+set softtabstop=2
+set shiftwidth=4
+set shiftround
+set noerrorbells visualbell t_vb=
+set autochdir
+set showcmd
+set wildmenu
+set showmatch
+set ruler
+set nowrap
+set formatoptions-=t
+set hlsearch
+set ignorecase
+set smartcase
+set incsearch
+set textwidth=0
+set backspace=indent,eol,start
+set wildignore=*.o,*.obj,*.bak,*.exe,*.pyc,*.swp,*/tmp/*,*.so,*.zip,*.tgz,*.tar.gz,*.iso
+set completeopt=menu,menuone,noselect,noinsert
+set complete=.,w,b,u,U,i,t
+set confirm
+set breakindent
+set cmdheight=1
+set nonumber
+set ttyfast
+set omnifunc=syntaxcomplete#Complete
+set infercase
+set diffopt=vertical,filler,iwhite
+set linebreak
+set linespace=0
+set scrolloff=3
+set sidescrolloff=5
+set nowritebackup
+set nobackup
+execute 'set directory=' . fnameescape(s:vim_state . '/swap//')
+if !isdirectory(s:vim_state . '/swap')
+  call mkdir(s:vim_state . '/swap', 'p', 0700)
+endif
+if executable('/opt/homebrew/bin/bash')
+  set shell=/opt/homebrew/bin/bash
+else
+  set shell=/bin/bash
+endif
+
+if has('conceal')
+  set conceallevel=2 concealcursor=niv
+endif
+
+let NERDTreeShowHidden=1
+nnoremap <leader>, :NERDTreeToggle<CR>
+let NERDTreeIgnore = ['\~$', '\.pyc$', '\*NTUSER*', '\*ntuser*', '\NTUSER.DAT', '\ntuser.ini']
+let NERDTreeWinSize=80
+
+let g:terraform_align=1
+let g:terraform_fmt_on_save=1
+
+let g:go_code_completion_enabled=1
+let g:go_bin_path=expand('~/.vimgo')
+let g:go_metalinter_enabled=['all']
+
+command! -range -nargs=0 -bar JsonPretty <line1>,<line2>!jq --sort-keys '.'
+
+augroup pkar_filetypes
+  autocmd!
+  autocmd BufNewFile,BufRead *.go setlocal noexpandtab tabstop=4 shiftwidth=4
+  autocmd FileType go inoremap <buffer> . .<C-x><C-o>
+  autocmd BufNewFile,BufRead *.json set filetype=javascript
+  autocmd BufRead,BufNewFile *.md set filetype=markdown
+  autocmd FileType html,markdown setlocal omnifunc=htmlcomplete#CompleteTags
+  autocmd FileType css setlocal omnifunc=csscomplete#CompleteCSS
+  autocmd FileType bash,sh,ps1,template,bzl,bazel,html,yaml,json,tf,terraform,hcl,tmpl,python setlocal expandtab
+  autocmd FileType javascript setlocal omnifunc=javascriptcomplete#CompleteJS
+  autocmd FileType python setlocal smartindent cinwords=if,elif,else,for,while,try,except,finally,def,class
+  autocmd FileType python setlocal omnifunc=pythoncomplete#Complete
+  autocmd BufWritePre *.py,*.java,*.js,*.go silent! %s/\s\+$//e
+augroup END
+
+augroup spell_settings
+  autocmd!
+  autocmd BufEnter *.txt setlocal spell spelllang=en_us
+  autocmd BufEnter *.md setlocal spell spelllang=en_us
+augroup END
+
+augroup reload_vimrc
+  autocmd!
+  autocmd BufWritePost vimrc source $MYVIMRC
+augroup END

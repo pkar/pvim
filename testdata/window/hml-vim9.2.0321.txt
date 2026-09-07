@@ -1,0 +1,77 @@
+# Where H, M and L land, measured 2026-09-04 against /opt/homebrew/bin/vim,
+# VIM 9.2 patches 1-321, the same way as the scroll table beside this one.
+#
+#   keys  height  scrolloff  topline  cursor  ->  topline  cursor  scroll
+#
+# The three motions live in internal/motion, which may not import this package
+# and is handed a window.Visible instead. This table is here rather than there
+# because what it really tests is whether Visible carries enough: Top, Bottom
+# and the two AtTop/AtBottom flags that suspend 'scrolloff' at the ends of the
+# buffer. internal/window/visible_test.go replays it through the same rule
+# internal/motion implements, so a Visible that starts reporting the wrong
+# bottom line fails here as well as there.
+H             23  0  100  110 ->  100  100  11
+M             23  0  100  110 ->  100  111  11
+L             23  0  100  110 ->  100  122  11
+3H            23  0  100  110 ->  100  102  11
+3L            23  0  100  110 ->  100  120  11
+H             23  0    1    5 ->    1    1  11
+L             23  0    1    5 ->    1   23  11
+M             23  0    1    5 ->    1   12  11
+H             23  0  378  390 ->  378  378  11
+L             23  0  378  390 ->  378  400  11
+M             23  0  378  390 ->  378  389  11
+30H           23  0  100  110 ->  100  122  11
+30L           23  0  100  110 ->  100  100  11
+H             23  3  100  110 ->  100  103  11
+M             23  3  100  110 ->  100  111  11
+L             23  3  100  110 ->  100  119  11
+3H            23  3  100  110 ->  100  103  11
+3L            23  3  100  110 ->  100  119  11
+H             23  3    1    5 ->    1    1  11
+L             23  3    1    5 ->    1   20  11
+M             23  3    1    5 ->    1   12  11
+H             23  3  378  390 ->  378  381  11
+L             23  3  378  390 ->  378  400  11
+M             23  3  378  390 ->  378  389  11
+30H           23  3  100  110 ->  100  119  11
+30L           23  3  100  110 ->  100  103  11
+H             23  5  100  110 ->  100  105  11
+M             23  5  100  110 ->  100  111  11
+L             23  5  100  110 ->  100  117  11
+3H            23  5  100  110 ->  100  105  11
+3L            23  5  100  110 ->  100  117  11
+H             23  5    1    5 ->    1    1  11
+L             23  5    1    5 ->    1   18  11
+M             23  5    1    5 ->    1   12  11
+H             23  5  378  390 ->  378  383  11
+L             23  5  378  390 ->  378  400  11
+M             23  5  378  390 ->  378  389  11
+30H           23  5  100  110 ->  100  117  11
+30L           23  5  100  110 ->  100  105  11
+H             12  0  100  110 ->  100  100   6
+M             12  0  100  110 ->  100  105   6
+L             12  0  100  110 ->  100  111   6
+3H            12  0  100  110 ->  100  102   6
+3L            12  0  100  110 ->  100  109   6
+H             12  0    1    5 ->    1    1   6
+L             12  0    1    5 ->    1   12   6
+M             12  0    1    5 ->    1    6   6
+H             12  0  379  390 ->  379  379   6
+L             12  0  379  390 ->  379  390   6
+M             12  0  379  390 ->  379  384   6
+30H           12  0  100  110 ->  100  111   6
+30L           12  0  100  110 ->  100  100   6
+H             12  3  102  110 ->  102  105   6
+M             12  3  102  110 ->  102  107   6
+L             12  3  102  110 ->  102  110   6
+3H            12  3  102  110 ->  102  105   6
+3L            12  3  102  110 ->  102  110   6
+H             12  3    1    5 ->    1    1   6
+L             12  3    1    5 ->    1    9   6
+M             12  3    1    5 ->    1    6   6
+H             12  3  382  390 ->  382  385   6
+L             12  3  382  390 ->  382  390   6
+M             12  3  382  390 ->  382  387   6
+30H           12  3  102  110 ->  102  110   6
+30L           12  3  102  110 ->  102  105   6

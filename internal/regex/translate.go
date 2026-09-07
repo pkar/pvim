@@ -1,0 +1,735 @@
+package regex
+
+import (
+	"strconv"
+	"strings"
+	"unicode/utf8"
+)
+
+// translator walks a vim pattern once, left to right, and writes Go regexp
+// source as it goes.
+//
+// There is no parse tree. Vim's grammar and RE2's agree on shape everywhere
+// that matters: an atom is an atom, a multi follows the atom it repeats, a
+// group is a group and alternation separates branches. What differs is which
+// characters spell which of those, and that is a table lookup per character.
+// Building an AST to move a `\+` to a `+` would be a second grammar to keep
+// right for no gain.
+type translator struct {
+	pat   string
+	i     int
+	magic Magic
+	opt   Options
+	out   strings.Builder
+
+	// forceIC and forceNoIC record \c and \C. They are not applied where they
+	// appear: both flags are pattern-wide in vim however late they turn up, and
+	// \c wins over \C no matter which came first, which is vim's RF_ICASE
+	// beating RF_NOICASE in regcomp.
+	forceIC   bool
+	forceNoIC bool
+
+	// depth is the count of groups still open, so an unmatched one is an error
+	// with a column rather than whatever the standard library would say about
+	// source the caller never wrote.
+	depth int
+
+	// hasAtom says a multi has something to repeat. Vim turns a `*` with
+	// nothing in front of it into a literal star, and errors on a `+` in the
+	// same place, so the two questions have to be asked separately.
+	hasAtom bool
+
+	// atStart says a `^` here is the start-of-line assertion rather than a
+	// literal caret. True at the start of the pattern and after `\(`, `\%(`,
+	// `\|` and `\n`, which is vim's rule exactly.
+	atStart bool
+}
+
+// translate is the whole job: pattern in, Go source out, with the case flags
+// resolved into the prefix.
+func translate(pat string, opt Options) (src string, ignoreCase bool, err error) {
+	t := &translator{pat: pat, magic: opt.magic(), opt: opt, atStart: true}
+	if err := t.run(); err != nil {
+		return "", false, err
+	}
+	ic := t.ignoreCase()
+	prefix := "(?m)"
+	if ic {
+		prefix = "(?im)"
+	}
+	return prefix + t.out.String(), ic, nil
+}
+
+// ignoreCase resolves \c, \C, 'ignorecase' and 'smartcase' into one bool.
+//
+// The order is vim's: an explicit \c anywhere in the pattern beats an explicit
+// \C anywhere in the pattern, both beat the options, and 'smartcase' only ever
+// takes case sensitivity back on, never off.
+func (t *translator) ignoreCase() bool {
+	switch {
+	case t.forceIC:
+		return true
+	case t.forceNoIC:
+		return false
+	case !t.opt.IgnoreCase:
+		return false
+	case t.opt.SmartCase && hasUpper(t.pat):
+		return false
+	default:
+		return true
+	}
+}
+
+func (t *translator) run() error {
+	for t.i < len(t.pat) {
+		if err := t.item(); err != nil {
+			return err
+		}
+	}
+	if t.depth != 0 {
+		return SyntaxError{Pattern: t.pat, Col: len(t.pat), Msg: "unmatched group"}
+	}
+	return nil
+}
+
+func (t *translator) item() error {
+	if t.pat[t.i] == '\\' {
+		return t.escaped()
+	}
+	return t.bare()
+}
+
+// bare handles a character standing on its own. Whether it is an operator is
+// one lookup in the magic table; everything else is a literal, which is most of
+// every pattern anyone writes.
+func (t *translator) bare() error {
+	c := t.pat[t.i]
+	if !bareIsOperator(c, t.magic) {
+		return t.literalRune()
+	}
+	return t.operator(c, 1)
+}
+
+// escaped handles a backslash and the character after it.
+//
+// The letters come first because none of them appear in the magic table: a
+// letter is never an operator on its own, so `\s` means the whitespace class at
+// every magic level and there is nothing to decide. Only after those does the
+// table get asked, and there it answers the mirror of what it told bare.
+func (t *translator) escaped() error {
+	if t.i+1 >= len(t.pat) {
+		return SyntaxError{Pattern: t.pat, Col: t.i, Msg: `pattern ends in a backslash`}
+	}
+	c := t.pat[t.i+1]
+
+	switch c {
+	case 'v':
+		t.magic, t.i = VeryMagic, t.i+2
+		return nil
+	case 'm':
+		t.magic, t.i = MagicOn, t.i+2
+		return nil
+	case 'M':
+		t.magic, t.i = NoMagic, t.i+2
+		return nil
+	case 'V':
+		t.magic, t.i = VeryNoMagic, t.i+2
+		return nil
+	case 'c':
+		t.forceIC, t.i = true, t.i+2
+		return nil
+	case 'C':
+		t.forceNoIC, t.i = true, t.i+2
+		return nil
+	case 'Z':
+		return UnsupportedError{Refusal{Atom: `\Z`, Col: t.i}}
+	case '_':
+		return t.underscore()
+	case 'z':
+		return t.externalMatch()
+	case 'e':
+		return t.emitEscape(0x1b)
+	case 't':
+		return t.emitEscape('\t')
+	case 'r':
+		return t.emitEscape('\r')
+	case 'b':
+		return t.emitEscape('\b')
+	case 'n':
+		// A line break is the one atom that leaves atStart set, because vim
+		// lets a `^` follow it and still mean start-of-line.
+		t.emitAtom(`\n`)
+		t.atStart = true
+		t.i += 2
+		return nil
+	case '1', '2', '3', '4', '5', '6', '7', '8', '9':
+		return BackreferenceError{Refusal{Atom: `\` + string(c), Col: t.i}}
+	}
+
+	if cl, ok := classes[c]; ok {
+		t.emitAtom(cl.expr(false))
+		t.i += 2
+		return nil
+	}
+	if escapedIsOperator(c, t.magic) {
+		return t.operator(c, 2)
+	}
+	// A backslash in front of anything else is that thing, literally. `\/` in a
+	// search pattern is the commonest one by a mile.
+	t.i++
+	return t.literalRune()
+}
+
+// operator dispatches the operator characters. width is 1 when the operator was
+// written bare and 2 when it was written with a backslash, so that every branch
+// can advance without caring which spelling it got.
+func (t *translator) operator(c byte, width int) error {
+	col := t.i
+	switch c {
+	case '.':
+		t.emitAtom(".")
+		t.i += width
+		return nil
+	case '[':
+		return t.collection(width, false)
+	case '~':
+		return t.lastSubstitute(width)
+	case '^':
+		return t.caret(width)
+	case '$':
+		return t.dollar(width)
+	case '(':
+		t.emitGroupOpen("(")
+		t.i += width
+		return nil
+	case ')':
+		if t.depth == 0 {
+			return SyntaxError{Pattern: t.pat, Col: col, Msg: "unmatched )"}
+		}
+		t.depth--
+		t.out.WriteString(")")
+		t.hasAtom, t.atStart = true, false
+		t.i += width
+		return nil
+	case '|':
+		t.out.WriteString("|")
+		t.hasAtom, t.atStart = false, true
+		t.i += width
+		return nil
+	case '<', '>':
+		// Go's \b is the same assertion at both ends of a word, which is the
+		// documented gap: it is not 'iskeyword'-aware where vim's is.
+		t.emitAtom(`\b`)
+		t.i += width
+		return nil
+	case '%':
+		return t.percent(width)
+	case '@':
+		return t.lookaround(width)
+	case '&':
+		return BranchError{Refusal{Atom: spell(`&`, width), Col: col}}
+	case '*':
+		if !t.hasAtom {
+			// Vim's one gentle multi: a bare star with nothing to repeat is a
+			// star. Only the bare one. Under \M and \V the operator is spelled
+			// `\*` and vim errors on it here, which is the difference between
+			// /*ptr finding a C pointer and \M\* finding nothing at all.
+			if width != 1 {
+				return SyntaxError{Pattern: t.pat, Col: col, Msg: "misplaced *"}
+			}
+			t.i += width
+			t.out.WriteString(`\*`)
+			t.hasAtom, t.atStart = true, false
+			return nil
+		}
+		t.out.WriteString("*")
+		t.i += width
+		return nil
+	case '+', '?', '=':
+		if !t.hasAtom {
+			return SyntaxError{Pattern: t.pat, Col: col, Msg: "misplaced " + string(c)}
+		}
+		if c == '+' {
+			t.out.WriteString("+")
+		} else {
+			t.out.WriteString("?")
+		}
+		t.i += width
+		return nil
+	case '{':
+		return t.brace(width)
+	}
+	return SyntaxError{Pattern: t.pat, Col: col, Msg: "unknown operator " + string(c)}
+}
+
+// caret emits either the start-of-line assertion or a literal caret, by vim's
+// position rule. Under \v a caret is always the assertion, wherever it stands,
+// and under \V so is the `\^` spelling, which is the only one that reaches
+// here at that level: peekchr turns `\^` and `\$` into the magic form at
+// MAGIC_NONE with no position test at all.
+func (t *translator) caret(width int) error {
+	if t.magic == VeryMagic || t.magic == VeryNoMagic || t.atStart {
+		t.out.WriteString("^")
+		t.i += width
+		t.atStart = false
+		// Deliberately leaves hasAtom false: vim reads the `*` in `^*ab` as a
+		// literal star, and that only works if `^` is not an atom to repeat.
+		return nil
+	}
+	t.i += width
+	t.out.WriteString(`\^`)
+	t.hasAtom, t.atStart = true, false
+	return nil
+}
+
+// dollar emits either the end-of-line assertion or a literal dollar. Vim only
+// takes it as the assertion at the very end of the pattern or right before
+// `\|`, `\)` or `\n`; under \v it is always the assertion, and under \V the
+// `\$` spelling is too, for the reason caret gives.
+func (t *translator) dollar(width int) error {
+	if t.magic == VeryMagic || t.magic == VeryNoMagic || t.endOfBranch(t.i+width) {
+		t.out.WriteString("$")
+		t.i += width
+		t.hasAtom, t.atStart = false, false
+		return nil
+	}
+	t.i += width
+	t.out.WriteString(`\$`)
+	t.hasAtom, t.atStart = true, false
+	return nil
+}
+
+// endOfBranch reports whether position j is the end of the pattern or the start
+// of the atom that closes a branch, looking past any run of switch atoms first.
+//
+// The skip is vim's, in peekchr: \c \C \m \M \v \V and \Z after a `$` do
+// not stop it being the end-of-line anchor. Appending `\c` to make a search
+// case-insensitive is the standard vim habit, so `error$\c` is a shape people
+// type every day and it anchors. The level the skipped atoms leave behind still
+// counts, because a `\v` after the `$` is what decides whether the `|` after
+// that spells the alternation, which is why magicAll is tracked and not just
+// stepped over. The switch itself is still handled by escaped(), where it
+// belongs; this only decides the anchor.
+func (t *translator) endOfBranch(j int) bool {
+	rest := t.pat[j:]
+	magicAll := t.magic == VeryMagic
+	for len(rest) >= 2 && rest[0] == '\\' && strings.IndexByte(`cCmMvVZ`, rest[1]) >= 0 {
+		switch rest[1] {
+		case 'v':
+			magicAll = true
+		case 'm', 'M', 'V':
+			magicAll = false
+		}
+		rest = rest[2:]
+	}
+	if rest == "" {
+		return true
+	}
+	if magicAll && (rest[0] == '|' || rest[0] == ')') {
+		return true
+	}
+	return strings.HasPrefix(rest, `\|`) || strings.HasPrefix(rest, `\)`) || strings.HasPrefix(rest, `\n`)
+}
+
+// underscore handles the `\_` forms, which are the ordinary atom plus the line
+// break. The character after `\_` is read at magic level regardless of the
+// level in force, because `\M\_.` and `\M\_\.` both mean any character or a
+// line break and vim accepts either spelling.
+func (t *translator) underscore() error {
+	col := t.i
+	j := t.i + 2
+	if j < len(t.pat) && t.pat[j] == '\\' {
+		j++
+	}
+	if j >= len(t.pat) {
+		return SyntaxError{Pattern: t.pat, Col: col, Msg: `\_ at the end of the pattern`}
+	}
+	c := t.pat[j]
+	width := j + 1 - t.i
+
+	if cl, ok := classes[c]; ok {
+		t.emitAtom(cl.expr(true))
+		t.i += width
+		return nil
+	}
+	switch c {
+	case '.':
+		t.emitAtom("(?s:.)")
+		t.i += width
+		return nil
+	case '[':
+		// The collection parser wants t.i on the '[' and the width of the run
+		// that got it there.
+		t.i = j
+		return t.collection(1, true)
+	case '^':
+		// (?m) is already on the whole pattern, so a start-of-line assertion
+		// anywhere is just ^.
+		t.out.WriteString("^")
+		t.i += width
+		return nil
+	case '$':
+		t.out.WriteString("$")
+		t.i += width
+		return nil
+	}
+	return SyntaxError{Pattern: t.pat, Col: col, Msg: `\_ must be followed by a character class, ., [, ^ or $`}
+}
+
+// externalMatch refuses the `\z` family. All of it belongs to :syntax, which
+// pvim does not have and is not getting.
+func (t *translator) externalMatch() error {
+	atom := `\z`
+	if t.i+2 < len(t.pat) {
+		atom += string(t.pat[t.i+2])
+	}
+	switch {
+	case strings.HasPrefix(t.pat[t.i:], `\zs`):
+		return MatchStartError{Refusal{Atom: `\zs`, Col: t.i}}
+	case strings.HasPrefix(t.pat[t.i:], `\ze`):
+		return MatchEndError{Refusal{Atom: `\ze`, Col: t.i}}
+	}
+	return ExternalMatchError{Refusal{Atom: atom, Col: t.i}}
+}
+
+// lookaround refuses the five `\@` forms, each by name, because "unsupported"
+// without the name sends the reader back to the pattern to work out which of
+// the five they wrote.
+func (t *translator) lookaround(width int) error {
+	col := t.i
+	rest := t.pat[t.i+width:]
+	prefix := spell("@", width)
+	switch {
+	case strings.HasPrefix(rest, "<="):
+		return LookbehindError{Refusal{Atom: prefix + "<=", Col: col}}
+	case strings.HasPrefix(rest, "<!"):
+		return NegLookbehindError{Refusal{Atom: prefix + "<!", Col: col}}
+	case strings.HasPrefix(rest, "="):
+		return LookaheadError{Refusal{Atom: prefix + "=", Col: col}}
+	case strings.HasPrefix(rest, "!"):
+		return NegLookaheadError{Refusal{Atom: prefix + "!", Col: col}}
+	case strings.HasPrefix(rest, ">"):
+		return AtomicGroupError{Refusal{Atom: prefix + ">", Col: col}}
+	}
+	return SyntaxError{Pattern: t.pat, Col: col, Msg: `\@ must be followed by =, !, >, <= or <!`}
+}
+
+// percent handles everything spelled `\%` under magic and `%` under \v: the
+// non-capturing group, the file anchors, the numeric character forms, and the
+// six position atoms that are refused.
+func (t *translator) percent(width int) error {
+	col := t.i
+	j := t.i + width
+	if j >= len(t.pat) {
+		return SyntaxError{Pattern: t.pat, Col: col, Msg: spell("%", width) + " at the end of the pattern"}
+	}
+	prefix := spell("%", width)
+
+	switch c := t.pat[j]; c {
+	case '(':
+		t.emitGroupOpen("(?:")
+		t.i = j + 1
+		return nil
+	case '^':
+		t.out.WriteString(`\A`)
+		t.i, t.atStart = j+1, false
+		return nil
+	case '$':
+		t.out.WriteString(`\z`)
+		t.i, t.atStart = j+1, false
+		return nil
+	case 'V':
+		return VisualAreaError{Refusal{Atom: prefix + "V", Col: col}}
+	case '[':
+		return OptionalSequenceError{Refusal{Atom: prefix + "[", Col: col}}
+	case 'C':
+		return UnsupportedError{Refusal{Atom: prefix + "C", Col: col}}
+	case '#':
+		// \%#=1 picks vim's regexp engine. pvim has one engine, so the atom is
+		// read and dropped rather than refused: the pattern it prefixes is
+		// ordinary and refusing it would fail patterns that work.
+		if j+1 < len(t.pat) && t.pat[j+1] == '=' {
+			end := j + 2
+			for end < len(t.pat) && t.pat[end] >= '0' && t.pat[end] <= '9' {
+				end++
+			}
+			t.i = end
+			return nil
+		}
+		return CursorError{Refusal{Atom: prefix + "#", Col: col}}
+	case '\'':
+		atom := prefix + "'"
+		if j+1 < len(t.pat) {
+			atom += string(t.pat[j+1])
+		}
+		return MarkError{Refusal{Atom: atom, Col: col}}
+	case 'd':
+		return t.numericChar(col, j+1, 10, 8, prefix+"d")
+	case 'x':
+		return t.numericChar(col, j+1, 16, 2, prefix+"x")
+	case 'o':
+		return t.octalChar(col, j+1, prefix+"o")
+	case 'u':
+		return t.numericChar(col, j+1, 16, 4, prefix+"u")
+	case 'U':
+		return t.numericChar(col, j+1, 16, 8, prefix+"U")
+	}
+	return t.position(col, j, prefix)
+}
+
+// position refuses \%23l, \%23c, \%23v and their \%<23l and \%>23l forms. It is
+// reached only when nothing else matched, so an unrecognised \% lands here as a
+// syntax error with the column.
+func (t *translator) position(col, j int, prefix string) error {
+	k := j
+	cmp := ""
+	if k < len(t.pat) && (t.pat[k] == '<' || t.pat[k] == '>') {
+		cmp = string(t.pat[k])
+		k++
+	}
+	if k < len(t.pat) && t.pat[k] == '\'' {
+		// \%<'m and \%>'m, the "before mark m" and "after mark m" atoms. They
+		// are the mark refusal and not a syntax error: a caller that cannot
+		// tell valid vim from a broken pattern is the one thing Refused exists
+		// to prevent.
+		atom := prefix + cmp + "'"
+		if k+1 < len(t.pat) {
+			atom += string(t.pat[k+1])
+		}
+		return MarkError{Refusal{Atom: atom, Col: col}}
+	}
+	digits := k
+	if k < len(t.pat) && t.pat[k] == '.' {
+		// \%.l is "the cursor line", spelled with a dot instead of a number.
+		k++
+	} else {
+		for k < len(t.pat) && t.pat[k] >= '0' && t.pat[k] <= '9' {
+			k++
+		}
+	}
+	if k == digits || k >= len(t.pat) {
+		return SyntaxError{Pattern: t.pat, Col: col, Msg: "unknown " + prefix + " atom"}
+	}
+	atom := prefix + cmp + t.pat[digits:k+1]
+	switch t.pat[k] {
+	case 'l':
+		return LineError{Refusal{Atom: atom, Col: col}}
+	case 'c':
+		return ColumnError{Refusal{Atom: atom, Col: col}}
+	case 'v':
+		return VirtualColumnError{Refusal{Atom: atom, Col: col}}
+	}
+	return SyntaxError{Pattern: t.pat, Col: col, Msg: "unknown " + prefix + " atom"}
+}
+
+// numericChar reads the digits of \%d123, \%x2a, \%o40, \%u20ac or \%U0001f600
+// and emits the character they name.
+func (t *translator) numericChar(col, j, base, maxDigits int, atom string) error {
+	k := j
+	for k < len(t.pat) && k-j < maxDigits && digitValue(t.pat[k]) < base {
+		k++
+	}
+	if k == j {
+		return SyntaxError{Pattern: t.pat, Col: col, Msg: atom + " needs at least one digit"}
+	}
+	n, err := strconv.ParseInt(t.pat[j:k], base, 64)
+	if err != nil || n < 0 || n > 0x10ffff {
+		return SyntaxError{Pattern: t.pat, Col: col, Msg: atom + " names no character"}
+	}
+	t.emitAtom(quoteRune(rune(n)))
+	t.i = k
+	return nil
+}
+
+// octalChar reads \%o40, which does not read the way the other numeric forms
+// do.
+//
+// Vim's getoctchrs takes at most three digits and stops before a digit as soon
+// as what it has is 0o40 or more, which caps the result at 0o377 and means
+// \%o570 is "/" followed by a literal "0" and not the character 0o570. Read it
+// greedily and that pattern quietly means something else.
+func (t *translator) octalChar(col, j int, atom string) error {
+	nr := 0
+	k := j
+	for k < len(t.pat) && k-j < 3 && nr < 0o40 && t.pat[k] >= '0' && t.pat[k] <= '7' {
+		nr = nr<<3 | int(t.pat[k]-'0')
+		k++
+	}
+	if k == j {
+		return SyntaxError{Pattern: t.pat, Col: col, Msg: atom + " needs at least one digit"}
+	}
+	t.emitAtom(quoteRune(rune(nr)))
+	t.i = k
+	return nil
+}
+
+// digitValue gives the value of a digit in any base up to 16, or 99 for
+// anything that is not one, so that a single comparison rejects it.
+func digitValue(c byte) int {
+	switch {
+	case c >= '0' && c <= '9':
+		return int(c - '0')
+	case c >= 'a' && c <= 'f':
+		return int(c-'a') + 10
+	case c >= 'A' && c <= 'F':
+		return int(c-'A') + 10
+	}
+	return 99
+}
+
+// brace translates the \{...} family, which carries both the counts and vim's
+// only laziness marker.
+func (t *translator) brace(width int) error {
+	col := t.i
+	j := t.i + width
+	lazy := false
+	if j < len(t.pat) && t.pat[j] == '-' {
+		lazy = true
+		j++
+	}
+	lo, loOK := "", false
+	for j < len(t.pat) && t.pat[j] >= '0' && t.pat[j] <= '9' {
+		lo += string(t.pat[j])
+		loOK = true
+		j++
+	}
+	comma := false
+	hi, hiOK := "", false
+	if j < len(t.pat) && t.pat[j] == ',' {
+		comma = true
+		j++
+		for j < len(t.pat) && t.pat[j] >= '0' && t.pat[j] <= '9' {
+			hi += string(t.pat[j])
+			hiOK = true
+			j++
+		}
+	}
+	// Vim closes the multi with either } or \}, and both spellings turn up in
+	// the wild often enough that accepting one would be a bug report.
+	switch {
+	case j < len(t.pat) && t.pat[j] == '}':
+		j++
+	case j+1 < len(t.pat) && t.pat[j] == '\\' && t.pat[j+1] == '}':
+		j += 2
+	default:
+		return SyntaxError{Pattern: t.pat, Col: col, Msg: "unclosed multi"}
+	}
+	if !t.hasAtom {
+		return SyntaxError{Pattern: t.pat, Col: col, Msg: "misplaced {"}
+	}
+
+	var rep string
+	switch {
+	case !loOK && !hiOK && !comma:
+		rep = "*" // \{} and \{-}
+	case loOK && !comma:
+		// An exact count. Laziness cannot change what "exactly n" matches, so
+		// \{-3} and \{3} emit the same thing rather than a {3}? nobody can read.
+		rep = "{" + lo + "}"
+		lazy = false
+	case comma && !hiOK:
+		rep = "{" + lo0(loOK, lo) + ",}"
+	default:
+		rep = "{" + lo0(loOK, lo) + "," + hi + "}"
+	}
+	if lazy {
+		rep += "?"
+	}
+	t.out.WriteString(rep)
+	t.i = j
+	return nil
+}
+
+// lo0 gives the lower bound of a multi, which vim leaves off in \{,5} and Go
+// insists on.
+func lo0(ok bool, lo string) string {
+	if ok {
+		return lo
+	}
+	return "0"
+}
+
+// lastSubstitute expands `~` into the string the caller says the last :s
+// replaced with.
+//
+// Vim inserts it as literal text and treats the whole run as one atom, so
+// `~\+` repeats the string and not its last character; the group is what makes
+// that true here. An empty last-substitute expands to an empty group rather
+// than the E33 vim would raise, because pvim's Options carries the string and
+// not the difference between empty and never-set.
+func (t *translator) lastSubstitute(width int) error {
+	var b strings.Builder
+	b.WriteString("(?:")
+	for _, r := range t.opt.LastSubstitute {
+		b.WriteString(quoteRune(r))
+	}
+	b.WriteString(")")
+	t.emitAtom(b.String())
+	t.i += width
+	return nil
+}
+
+// literalRune emits the rune at t.i as itself.
+func (t *translator) literalRune() error {
+	r, size := utf8.DecodeRuneInString(t.pat[t.i:])
+	t.emitAtom(quoteRune(r))
+	t.i += size
+	return nil
+}
+
+// emitEscape emits one of the \e \t \r \b \n escapes, which are the same
+// character at every magic level.
+func (t *translator) emitEscape(r rune) error {
+	t.emitAtom(quoteRune(r))
+	t.i += 2
+	return nil
+}
+
+// emitAtom writes one atom and records that a multi now has something to repeat.
+func (t *translator) emitAtom(s string) {
+	t.out.WriteString(s)
+	t.hasAtom = true
+	t.atStart = false
+}
+
+// emitGroupOpen writes a group opener and resets the two pieces of position
+// state, because the inside of a group starts a pattern of its own as far as
+// `^` and a leading `*` are concerned.
+func (t *translator) emitGroupOpen(s string) {
+	t.out.WriteString(s)
+	t.depth++
+	t.hasAtom, t.atStart = false, true
+}
+
+// spell writes an operator the way it was written in the pattern, so that the
+// atom in an error message is the text the user typed and not the text the
+// documentation uses.
+func spell(op string, width int) string {
+	if width == 2 {
+		return `\` + op
+	}
+	return op
+}
+
+// goMeta is every character Go's regexp parser reads as syntax outside a
+// character class. Each one gets a backslash when it is meant literally.
+const goMeta = `\.+*?()|[]{}^$`
+
+// quoteRune writes r as Go source that matches exactly r.
+func quoteRune(r rune) string {
+	if r < utf8.RuneSelf && strings.ContainsRune(goMeta, r) {
+		return `\` + string(r)
+	}
+	switch r {
+	case '\n':
+		return `\n`
+	case '\r':
+		return `\r`
+	case '\t':
+		return `\t`
+	}
+	if r < 0x20 || r == 0x7f {
+		return `\x{` + strconv.FormatInt(int64(r), 16) + `}`
+	}
+	return string(r)
+}

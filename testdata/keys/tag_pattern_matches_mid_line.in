@@ -1,0 +1,3 @@
+foo	buf.txt	/foo/
+zoo foo
+call foo

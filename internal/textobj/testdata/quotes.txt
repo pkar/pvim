@@ -1,0 +1,10 @@
+say "hello world" and 'x' here
+a "b" c "d" e
+"start" mid "end"
+esc "a\"b" tail
+'single' and `back` ok
+no quotes here
+"unclosed and more
+  "  pad  "  x
+empty "" here
+he said `x` and "y"

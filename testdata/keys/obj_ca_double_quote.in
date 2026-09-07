@@ -1,0 +1,3 @@
+say "hello there" ok
+it's a 'quoted' word
+run `code` now

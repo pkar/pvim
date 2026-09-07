@@ -1,0 +1,3 @@
+let g:vim_ai_roles_config_file = '~/.config/openai.roles.ini'
+
+" debug settings

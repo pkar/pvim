@@ -1,0 +1,243 @@
+set nocompatible " cp:    turns off strict vi compatibility
+
+" syntax on " enable syntax
+" filetype plugin indent on " required!
+colorscheme nofrils-dark
+set background=dark
+
+if has('gui_running')
+  " gvim specific settings here
+  set guifont=Monaco:h13
+endif
+
+" fix macvim crash
+set guioptions-=e
+
+" Time out on key codes but not mappings.
+" Basically this makes terminal Vim work sanely.
+if !has('gui_running')
+  set notimeout
+  set ttimeout
+  set ttimeoutlen=10
+  augroup FastEscape
+    autocmd!
+    au InsertEnter * set timeoutlen=0
+    au InsertLeave * set timeoutlen=1000
+  augroup END
+endif
+
+if has('mouse')
+  set mouse=a
+endif
+
+set clipboard=unnamed,unnamedplus,autoselect
+" if has('unnamed')
+"   " set clipboard=unnamed
+"   " set clipboard+=unnamedplus  " use the clipboards of vim and win
+"   " set paste                   " Paste from a windows or from vim
+"   " set go+=a                   " Visual selection automatically copied to the clipboard
+" endif
+if has('clipboard') && !has('gui_running')
+  vnoremap <C-c> "+y
+  vnoremap <C-x> "+d
+  vnoremap <C-v> "+p
+  inoremap <C-v> <C-r><C-o>+
+endif
+
+" copy and paste
+" vmap <C-c> "+yi
+" vmap <C-x> "+c
+" vmap <C-v> c<ESC>"+p
+" imap <C-v> <ESC>"+pa
+
+if has('persistent_undo')
+  set undofile
+  set undodir=~/.cache/vim
+endif
+
+let mapleader = ","
+" switch tabs
+map { gT
+map } gt
+
+" ~/.viminfo needs to be writable and readable
+" set viminfo='200
+" set history=9999 " big history
+" set lazyredraw          " Wait to redraw
+" set cursorline
+" set pumheight=20             " Completion window max size
+" set hidden " load files in background
+" set completeopt-=preview " disable scratch window
+" set completeopt=menu,menuone
+set enc=utf-8
+set fileencoding=utf-8 " UTF-8
+set tabstop=2       " number of visual spaces per TAB
+set softtabstop=2   " number of spaces in tab when editing
+set noerrorbells visualbell t_vb= " Disable ALL bells"
+set autochdir
+set showcmd             " show command in bottom bar
+set wildmenu           " Autocomplete features in the status bar
+set showmatch
+set ruler
+set nowrap           " do not automatically wrap on load
+set formatoptions-=t " do not automatically wrap text when typing
+set hlsearch         " highlight search
+set ignorecase       " Do case in sensitive matching with
+set smartcase        " be sensitive when there's a capital letter
+set incsearch        " 
+set textwidth=0      " Don't wrap lines by default
+set shiftwidth=4
+set shiftround
+set backspace=indent,eol,start
+set wildignore=*.o,*.obj,*.bak,*.exe,*.pyc,*.swp,*/tmp/*,*.so,*.swp,*.zip,*.tgz,*.tar.gz,*.iso
+set completeopt=menu,menuone,noselect,noinsert
+set complete=.,w,b,u,U,i,t " complete options
+set confirm
+set breakindent " this is just awesome (best patch in a long time)
+set cmdheight=1 " Gets rid of all the press enter to continue
+set nonumber " no line numbers
+set shiftround " when at 3 spaces, and I hit > ... go to 4, not 5
+set ttimeout " time out on key codes
+set ttyfast " Assume a fast terminal
+set omnifunc=syntaxcomplete#Complete
+set infercase " case inferred by default
+set diffopt=vertical,filler,iwhite " filler and whitespace
+set linebreak " break on words not mid-word
+set linespace=0 " don't insert any extra pixel lines betweens rows
+
+nnoremap <Space> za " Spacebar to unfold
+
+set nowritebackup
+set nobackup
+set directory=/tmp// " prepend(^=) $HOME/.tmp/ to default path; use full path as backup filename(//)
+
+let g:terraform_align=1
+let g:terraform_fmt_on_save=1
+let g:ctrlp_max_height=40
+let g:ctrlp_match_window='results:40'
+" Ignore some folders and files for CtrlP indexing
+let g:ctrlp_custom_ignore = {
+  \ 'dir':  '\.git$\|\.yardoc\|public$|log\|tmp|\.hg|\.svn$',
+  \ 'file': '\.so$\|\.dat$|\.DS_Store|\.pyc$'
+  \ }
+
+let NERDTreeShowHidden=1
+nnoremap <leader>, :NERDTreeToggle<CR>
+let NERDTreeIgnore = ['\~$','\.pyc$','\*NTUSER*','\*ntuser*','\NTUSER.DAT','\ntuser.ini']
+let NERDTreeWinSize=80
+
+set shell=/opt/homebrew/bin/bash
+command! -range -nargs=0 -bar JsonPretty <line1>,<line2>!jq --sort-keys '.'
+" command! -range -nargs=0 -bar JsonPretty <line1>,<line2>!python -m json.tool
+" let g:go_addtags_transform = 'snakecase'
+" let g:go_auto_sameids = 0
+" let g:go_auto_type_info = 0
+" let g:go_snippet_engine = 'automatic' " ultisnips
+" let g:go_snippet_engine = 'ultisnip'
+
+" let g:go_autodetect_gopath = 1
+" let g:go_fmt_fail_silently = 0
+let g:go_code_completion_enabled = 1
+" let g:go_list_type = 'quickfix'
+let g:go_bin_path = expand('~/.vimgo')
+" let g:go_template_autocreate = 0 " maybe to stop ssh github user prompt
+" let g:go_fmt_autosave = 1
+" let g:go_fmt_command = 'gopls' " 'gofmt' 'goimports' 'gopls'
+" let g:go_def_mode='gopls'
+" let g:go_info_mode='gopls'
+" let g:go_jump_to_error = 0
+" let g:go_metalinter_autosave = 1
+" let g:go_metalinter_deadline = '5s'
+
+" let g:go_metalinter_command = 'golangci-lint'
+let g:go_metalinter_enabled = ['all'] " ['vet', 'revive', 'errcheck', '']
+" let g:go_metalinter_autosave_enabled = ['vet', 'revive'] " 'all'
+" let g:ale_linters = {'go': ['gofmt', 'go vet']}
+" let g:ale_sign_column_always = 0
+
+if has("autocmd")
+  autocmd BufNewFile,BufRead *.go setlocal noexpandtab tabstop=4 shiftwidth=4
+  au filetype go inoremap <buffer> . .<C-x><C-o>
+  autocmd BufNewFile,BufRead *.json set filetype=javascript
+  autocmd BufRead,BufNewFile *.md set filetype=markdown
+  autocmd FileType html,markdown setlocal omnifunc=htmlcomplete#CompleteTags
+  autocmd FileType css setlocal omnifunc=csscomplete#CompleteCSS
+  autocmd FileType bash set expandtab       " tabs are spaces
+  autocmd FileType sh set expandtab       " tabs are spaces
+  autocmd FileType ps1 set expandtab       " tabs are spaces
+  autocmd FileType template set expandtab       " tabs are spaces
+  autocmd FileType bzl set expandtab       " tabs are spaces
+  autocmd FileType bazel set expandtab       " tabs are spaces
+  autocmd FileType sh set expandtab       " tabs are spaces
+  autocmd FileType html set expandtab       " tabs are spaces
+  autocmd FileType yaml set expandtab       " tabs are spaces
+  autocmd FileType json set expandtab       " tabs are spaces
+  autocmd FileType tf set expandtab       " tabs are spaces
+  autocmd FileType terraform set expandtab       " tabs are spaces
+  autocmd FileType hcl set expandtab       " tabs are spaces
+  autocmd FileType tmpl set expandtab       " tabs are spaces
+  autocmd FileType javascript setlocal omnifunc=javascriptcomplete#CompleteJS
+  autocmd FileType python set expandtab       " tabs are spaces
+  autocmd FileType python set smartindent cinwords=if,elif,else,for,while,try,except,finally,def,class
+  autocmd FileType python setlocal omnifunc=pythoncomplete#Complete
+  autocmd Filetype python,java,javascript,go autocmd BufWritePre * :%s/\s\+$//e
+  augroup spell_settings
+    au!
+    au BufEnter *.txt setlocal spell spelllang=en_us
+    au BufEnter *.md  setlocal spell spelllang=en_us
+    " to add multiple commands just append:
+    " au BufEnter *.md  setlocal syntax
+  augroup END
+  augroup myvimrc
+    au!
+    au BufWritePost .vimrc,_vimrc,vimrc,.gvimrc,_gvimrc,gvimrc so $MYVIMRC | if has('gui_running') && filereadable($MYGVIMRC) | so $MYGVIMRC | endif
+  augroup END
+endif
+
+set scrolloff=3        " keep at least 3 lines above/below"
+if !&scrolloff
+  set scrolloff=1
+endif
+if !&sidescrolloff
+  set sidescrolloff=5
+endif
+
+" For conceal markers.
+if has('conceal')
+  set conceallevel=2 concealcursor=niv
+endif
+
+" https://github.com/Exafunction/codeium.vim
+" imap <C-e>   <Cmd>call codeium#CycleCompletions(1)<CR>
+" imap <C-w>   <Cmd>call codeium#CycleCompletions(-2)<CR>
+" " imap <C-c>   <Cmd>call codeium#Clear()<CR>
+" imap <C-Bslash>   <Cmd>call codeium#Complete()<CR>
+" let g:codeium_enabled = v:true
+" let g:codeium_filetypes_disabled_by_default = v:true
+" let g:codeium_filetypes = {
+"     \ \"tf": v:true,
+"     \ \"md": v:true,
+"     \ \"bazel": v:true,
+"     \ \"bzl": v:true,
+"     \ \"go": v:true,
+"     \ }
+
+" https://github.com/CoderCookE/vim-chatgpt
+" let g:openai_api_key=''
+" let g:chat_gpt_max_tokens=2000
+" let g:chat_gpt_model='gpt-4o'
+" let g:chat_gpt_session_mode=0
+" let g:chat_gpt_temperature = 0.7
+" let g:chat_gpt_lang = 'English'
+" let g:chat_gpt_split_direction = 'vertical'
+" let g:split_ratio=4
+
+" https://github.com/madox2/vim-ai?tab=readme-ov-file
+" mkdir -p ~/.vim/pack/plugins/start
+" git clone https://github.com/madox2/vim-ai.git ~/.vim/pack/plugins/start/vim-ai
+let g:vim_ai_token_file_path = '~/.config/openai.token'
+let g:vim_ai_roles_config_file = '~/.config/openai.roles.ini'
+
+" debug settings
+let g:vim_ai_debug = 0
+let g:vim_ai_debug_log_file = "/tmp/vim_ai_debug.log"

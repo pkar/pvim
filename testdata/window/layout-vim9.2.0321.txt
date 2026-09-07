@@ -1,0 +1,86 @@
+# What vim's window layout does, measured 2026-09-04 against
+# /opt/homebrew/bin/vim, VIM 9.2 patches 1-321, through
+#
+#   vim --clean -i NONE --not-a-term -n -S probe.vim -s KEYS f.txt
+#
+# with ":set lines=24 columns=80 ea nosb nospr" first, so every case starts
+# from one 23-row 80-column window on a 24-row screen with the command line
+# taking the last row, and 'laststatus' 1, which means the only window of a tab
+# has no status line and every window of a split one does.
+#
+# One vim per case. Running them in one session does not work: ":only" on a
+# single window prints "Already only one window", which is a message, and the
+# hit-enter prompt behind it eats the next few keystrokes and quietly shifts
+# everything after it.
+#
+# Each row is a tab-separated pair of the commands and the windows they leave,
+# in vim's own window order, each written
+#
+#   row,col,height,width
+#
+# from win_screenpos(), winheight() and winwidth(), with a "*" on the current
+# one. row and col are 1-based screen cells and height and width are the text
+# area, so a window with a status line under it occupies height+1 rows and one
+# with a separator beside it occupies width+1 columns.
+#
+# internal/window/layout_test.go replays every row.
+:sp	1,1,11,80* 13,1,10,80
+:sp :sp	1,1,7,80* 9,1,7,80 17,1,6,80
+:sp :sp :sp	1,1,5,80* 7,1,5,80 13,1,5,80 19,1,4,80
+:sp :sp :sp :sp	1,1,4,80* 6,1,4,80 11,1,3,80 15,1,4,80 20,1,3,80
+:vs	1,1,22,40* 1,42,22,39
+:vs :vs	1,1,22,26* 1,28,22,26 1,55,22,26
+:vs :vs :vs	1,1,22,20* 1,22,22,19 1,42,22,19 1,62,22,19
+:vs :sp	1,1,11,40* 13,1,10,40 1,42,22,39
+:sp :vs	1,1,11,40* 1,42,11,39 13,1,10,80
+sb :sp	1,1,10,80 12,1,11,80*
+spr :vs	1,1,22,39 1,41,22,40*
+:5sp	1,1,5,80* 7,1,16,80
+:30vs	1,1,22,30* 1,32,22,49
+noea :sp :sp	1,1,5,80* 7,1,5,80 13,1,10,80
+:sp :sp <C-W>+	1,1,8,80* 10,1,6,80 17,1,6,80
+:sp :sp 3<C-W>+	1,1,10,80* 12,1,4,80 17,1,6,80
+:sp :sp <C-W>-	1,1,6,80* 8,1,8,80 17,1,6,80
+:sp :sp <C-W>_	1,1,18,80* 20,1,1,80 22,1,1,80
+:sp :sp <C-W>_ <C-W>=	1,1,7,80* 9,1,7,80 17,1,6,80
+:sp :sp 10<C-W>_	1,1,10,80* 12,1,4,80 17,1,6,80
+:vs 5<C-W>>	1,1,22,45* 1,47,22,34
+:vs 5<C-W><	1,1,22,35* 1,37,22,44
+:vs <C-W>|	1,1,22,78* 1,80,22,1
+:sp :sp :q	1,1,11,80* 13,1,10,80
+:vs :sp :q	1,1,22,40* 1,42,22,39
+:sp :vs :only	1,1,23,80*
+:sp :sp <C-W>j	1,1,7,80 9,1,7,80* 17,1,6,80
+:sp :sp <C-W>b	1,1,7,80 9,1,7,80 17,1,6,80*
+:sp :sp <C-W>t	1,1,7,80* 9,1,7,80 17,1,6,80
+:sp :sp <C-W>w	1,1,7,80 9,1,7,80* 17,1,6,80
+:sp :sp 3<C-W>w	1,1,7,80 9,1,7,80 17,1,6,80*
+:sp :sp <C-W>W	1,1,7,80 9,1,7,80 17,1,6,80*
+:vs :sp <C-W>l	1,1,11,40 13,1,10,40 1,42,22,39*
+:vs :sp <C-W>l <C-W>h	1,1,11,40* 13,1,10,40 1,42,22,39
+:sp :sp <C-W>j <C-W>p	1,1,7,80* 9,1,7,80 17,1,6,80
+:sp :sp <C-W>j <C-W>k	1,1,7,80* 9,1,7,80 17,1,6,80
+:vs :sp <C-W>l <C-W>j	1,1,11,40 13,1,10,40 1,42,22,39*
+:sp :vs :q	1,1,11,80* 13,1,10,80
+:vs :vs :q	1,1,22,40* 1,42,22,39
+:sp :sp <C-W>_ <C-W>x	1,1,1,80* 3,1,18,80 22,1,1,80
+:sp :sp <C-W>_ <C-W>r	1,1,1,80 3,1,18,80* 22,1,1,80
+:sp :sp <C-W>_ <C-W>R	1,1,1,80 3,1,1,80 5,1,18,80*
+:sp :sp 2<C-W>x	1,1,7,80* 9,1,7,80 17,1,6,80
+:vs :vs <C-W>x	1,1,22,26* 1,28,22,26 1,55,22,26
+:sp <C-W>K	1,1,11,80* 13,1,10,80
+:sp <C-W>J	1,1,10,80 12,1,11,80*
+:sp <C-W>H	1,1,22,40* 1,42,22,39
+:sp <C-W>L	1,1,22,39 1,41,22,40*
+:vs <C-W>K	1,1,11,80* 13,1,10,80
+:vs <C-W>J	1,1,10,80 12,1,11,80*
+:sp :vs <C-W>K	1,1,7,80* 9,1,7,80 17,1,6,80
+:sp :vs <C-W>J	1,1,7,80 9,1,6,80 16,1,7,80*
+:sp :vs <C-W>H	1,1,22,40* 1,42,11,39 13,42,10,39
+:sp :vs <C-W>L	1,1,11,39 13,1,10,39 1,41,22,40*
+:vs :sp <C-W>K	1,1,11,80* 13,1,10,40 13,42,10,39
+:vs :sp <C-W>L	1,1,22,26 1,28,22,26 1,55,22,26*
+:sp :sp <C-W>j <C-W>K	1,1,7,80* 9,1,7,80 17,1,6,80
+:sp :sp <C-W>_ <C-W>J	1,1,7,80 9,1,6,80 16,1,7,80*
+:sp :sp 5<C-W>K	1,1,7,80* 9,1,7,80 17,1,6,80
+:sp :vs <C-W>K <C-W>J	1,1,7,80 9,1,6,80 16,1,7,80*

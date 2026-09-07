@@ -1,0 +1,29 @@
+# Title
+
+Some *emphasis* and **strong** and `code` and a [link](http://example.com).
+
+## Section
+
+- a list item
+- another with `inline code`
+
+> a blockquote
+
+```go
+func main() {}
+```
+
+    indented code block
+
+| a | b |
+|---|---|
+| 1 | 2 |
+
+Setext
+======
+
+<div class="x">html</div>
+
+A line with a footnote[^1] and an ![image](i.png).
+
+[^1]: the note

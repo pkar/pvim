@@ -1,0 +1,4 @@
+!_TAG_FILE_SORTED	1	//
+foo	buf.txt	/^int foo/
+int foo
+call foo

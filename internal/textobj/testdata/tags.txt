@@ -1,0 +1,10 @@
+<div><p>hello</p></div>
+<a href="x>y">text</a>
+<br/><b>bold</b>
+<ul>
+  <li>one</li>
+  <li>two</li>
+</ul>
+<p>a<br/>b</p>
+<em>x <em>y</em> z</em>
+<A>up</a>

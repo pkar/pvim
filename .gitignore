@@ -1,0 +1,27 @@
+# Build output. bin/ holds what `make install` ships; dist/ holds the harness
+# and the cross builds, which are tools and not part of the program. The static
+# gate does not force that split: check 4 greps bin/ for a library sidecar and
+# has no opinion about a second binary sitting there.
+bin/
+dist/
+
+# Scratch the tests write: the oracle's copies of the buffer it ran vim over,
+# and the PNGs the raster goldens render before hashing. The hashes are
+# committed, the images never are.
+testdata/scratch/
+
+# Stray build output. `go build` with no -o and `go test -c` both drop a
+# binary next to the source, and neither belongs in the commit. The cmd/ entries
+# are spelled out because a bare `oracle` would also ignore the cmd/oracle
+# directory, which is where the harness actually lives.
+/pvim
+/oracle
+/cmd/pvim/pvim
+/cmd/oracle/oracle
+*.test
+/out.txt
+
+# Working notes, not a deliverable.
+STATUS.md
+DIFFERENCES.md
+MANUAL-CHECK.md

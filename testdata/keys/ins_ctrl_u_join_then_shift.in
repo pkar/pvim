@@ -1,0 +1,4 @@
+
+// count returns how many times b appears in s.
+func count(s, b string) int {
+}

@@ -1,0 +1,20 @@
+# a comment
+version: "3.9"
+services:
+  api:
+    image: alpine:3.19
+    command: ["sh", "-c", "echo hi"]
+    environment:
+      - FOO=bar
+      - BAZ=1
+    ports:
+      - 8080:80
+    deploy:
+      replicas: 2
+      labels: {a: b}
+anchors: &base
+  x: true
+  y: null
+derived:
+  <<: *base
+  z: 1.5

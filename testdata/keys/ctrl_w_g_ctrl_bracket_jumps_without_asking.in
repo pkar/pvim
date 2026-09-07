@@ -1,0 +1,4 @@
+bar	buf.txt	/^int bar/
+int foo
+int bar
+call bar here

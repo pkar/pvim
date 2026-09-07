@@ -1,0 +1,23 @@
+#!/opt/homebrew/bin/bash
+set -euo pipefail
+
+NAME="${1:-world}"
+readonly DIR=$(cd "$(dirname "$0")" && pwd)
+
+# a comment
+main() {
+  local n=0
+  for f in "$DIR"/*.txt; do
+    if [[ -r "$f" ]]; then
+      n=$((n + 1))
+      echo "hello $NAME: $f" >&2
+    fi
+  done
+  printf '%d files\n' "$n"
+  case "$NAME" in
+    a|b) echo ab ;;
+    *)   echo other ;;
+  esac
+}
+
+main "$@"

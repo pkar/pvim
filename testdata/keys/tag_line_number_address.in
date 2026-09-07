@@ -1,0 +1,5 @@
+foo	buf.txt	3
+alpha
+beta
+gamma
+call foo
