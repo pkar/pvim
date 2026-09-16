@@ -7,7 +7,7 @@ LINUXBIN := dist/$(BINARY)-linux-amd64
 # program; check 4 of the static gate has no opinion either way, it looks for a
 # library sidecar and not for a headcount.
 ORACLEBIN ?= dist/oracle
-DEST   ?= /usr/local/bin/$(BINARY)
+DEST   ?= $(HOME)/.local/bin/$(BINARY)
 # The two external tools the static gate shells out to, named so a test can
 # hand these targets a go that fails and an otool that is not installed and
 # watch them go red. Nothing else overrides them.
@@ -177,7 +177,8 @@ linux: ## a genuinely static linux/amd64 ELF, which macOS cannot have
 	@file $(LINUXBIN)
 
 install: static-check ## install bin/pvim to $(DEST)
-	install -m 0755 $(BIN) $(DEST)
+	mkdir -p "$$(dirname "$(DEST)")"
+	install -m 0755 "$(BIN)" "$(DEST)"
 
 clean: ## remove bin/ and dist/
 	rm -rf bin dist
