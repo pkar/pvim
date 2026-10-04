@@ -9,7 +9,7 @@ the parts of them I actually use: ctrlp, nerdtree, fugitive, vim-go.
 ## build
 
     make build      bin/pvim
-    make check      vet, test, static-check
+    make check      gofmt, vet, test, static-check
     make linux      dist/pvim-linux-amd64, a real static ELF
 
 go 1.26. four deps, all pure go: purego, x/image, x/sys, xgb.
