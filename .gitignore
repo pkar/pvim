@@ -25,3 +25,5 @@ testdata/scratch/
 STATUS.md
 DIFFERENCES.md
 MANUAL-CHECK.md
+/.slots/
+AGENTS.md
